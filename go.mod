@@ -1,4 +1,4 @@
-module github.com/conamu/nautilus-gateway
+module github.com/nautilus/gateway
 
 go 1.17
 
