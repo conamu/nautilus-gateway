@@ -7,3 +7,5 @@ require (
 	github.com/nautilus/graphql v0.0.26
 	github.com/spf13/cobra v0.0.5
 )
+
+replace github.com/nautilus/gateway => ../..
