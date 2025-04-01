@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"strings"
 
 	"github.com/vektah/gqlparser/v2/ast"
@@ -16,6 +17,7 @@ import (
 // remote schemas into one, generating a query plan to execute based on an incoming request, and following
 // that plan
 type Gateway struct {
+	nrApp              *newrelic.Application
 	sources            []*graphql.RemoteSchema
 	schema             *ast.Schema
 	planner            QueryPlanner
@@ -39,6 +41,7 @@ type Gateway struct {
 // RequestContext holds all of the information required to satisfy the user's query
 type RequestContext struct {
 	Context       context.Context
+	NrApp         *newrelic.Application
 	Query         string
 	OperationName string
 	Variables     map[string]interface{}
@@ -49,6 +52,7 @@ func (g *Gateway) GetPlans(ctx *RequestContext) (QueryPlanList, error) {
 	// let the persister grab the plan for us
 	return g.queryPlanCache.Retrieve(&PlanningContext{
 		Query:     ctx.Query,
+		NrApp:     g.nrApp,
 		Schema:    g.schema,
 		Gateway:   g,
 		Locations: g.fieldURLs,
@@ -82,6 +86,7 @@ func (g *Gateway) Execute(ctx *RequestContext, plans QueryPlanList) (map[string]
 	// build up the execution context
 	executionContext := &ExecutionContext{
 		logger:             g.logger,
+		nrApp:              g.nrApp,
 		RequestContext:     ctx.Context,
 		RequestMiddlewares: g.requestMiddlewares,
 		Plan:               plan,
@@ -242,6 +247,12 @@ func New(sources []*graphql.RemoteSchema, configs ...Option) (*Gateway, error) {
 // Option is a function to be passed to New that configures the
 // resulting schema
 type Option func(*Gateway)
+
+func WithNewRelic(nrApp *newrelic.Application) Option {
+	return func(g *Gateway) {
+		g.nrApp = nrApp
+	}
+}
 
 // WithPlanner returns an Option that sets the planner of the gateway
 func WithPlanner(p QueryPlanner) Option {

@@ -3,6 +3,8 @@ package gateway
 import (
 	"errors"
 	"fmt"
+	"github.com/newrelic/go-agent/v3/newrelic"
+	"net/http"
 	"sync"
 
 	"github.com/vektah/gqlparser/v2"
@@ -93,6 +95,7 @@ func (p *MinQueriesPlanner) WithLocationPriorities(priorities []string) QueryPla
 // PlanningContext is the input struct to the Plan method
 type PlanningContext struct {
 	Query     string
+	NrApp     *newrelic.Application
 	Schema    *ast.Schema
 	Locations FieldURLMap
 	Gateway   *Gateway
@@ -899,8 +902,10 @@ func (p *Planner) GetQueryer(ctx *PlanningContext, url string) graphql.Queryer {
 		return (*p.QueryerFactory)(ctx, url)
 	}
 
+	instrumentedRoundTripper := newrelic.NewRoundTripper(nil)
+
 	// return the queryer for the url
-	return graphql.NewSingleRequestQueryer(url)
+	return graphql.NewSingleRequestQueryer(url).WithHTTPClient(&http.Client{Transport: instrumentedRoundTripper})
 }
 
 func plannerBuildQuery(ctx *PlanningContext, operationName, parentType string, variables ast.VariableDefinitionList, selectionSet ast.SelectionSet, fragmentDefinitions ast.FragmentDefinitionList) *ast.QueryDocument {

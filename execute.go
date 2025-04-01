@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/newrelic/go-agent/v3/newrelic"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,6 +45,7 @@ type queryExecutionResult struct {
 // for a particular execution.
 type ExecutionContext struct {
 	logger             Logger
+	nrApp              *newrelic.Application
 	Plan               *QueryPlan
 	Variables          map[string]interface{}
 	RequestContext     context.Context
@@ -52,6 +54,9 @@ type ExecutionContext struct {
 
 // Execute returns the result of the query plan
 func (executor *ParallelExecutor) Execute(ctx *ExecutionContext) (map[string]interface{}, error) {
+	txn := newrelic.FromContext(ctx.RequestContext)
+	seg := txn.StartSegment("queryExecution")
+	defer seg.End()
 	// a place to store the result
 	result := map[string]interface{}{}
 
@@ -91,6 +96,9 @@ func (executor *ParallelExecutor) Execute(ctx *ExecutionContext) (map[string]int
 
 	// start a goroutine to add results to the list
 	go func() {
+		rTxn := txn.NewGoroutine()
+		rSeg := rTxn.StartSegment("queryExecutionResultStitching")
+		defer rSeg.End()
 		for {
 			select {
 			// we have a new result
@@ -162,6 +170,10 @@ func executeStep(
 	resultCh chan *queryExecutionResult,
 	stepWg *sync.WaitGroup,
 ) {
+	txn := newrelic.FromContext(ctx.RequestContext).NewGoroutine()
+	seg := txn.StartSegment("queryExecuteStep")
+	defer seg.End()
+
 	queryResult, dependentSteps, queryErr := executeOneStep(ctx, plan, step, insertionPoint, resultLock, queryVariables)
 	// before publishing the current result, tell the wait-group about the dependent steps to wait for
 	stepWg.Add(len(dependentSteps))
