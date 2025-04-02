@@ -74,7 +74,7 @@ func WithAutomaticQueryPlanCache() Option {
 }
 
 type queryPlanCacheItem struct {
-	LastUsed atomic.Value // time.Time `redis`
+	LastUsed atomic.Value // time.Time
 	Value    QueryPlanList
 }
 
